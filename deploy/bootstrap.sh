@@ -3,6 +3,14 @@
 # Idempotent: rerunning is safe.
 set -euo pipefail
 
+# Ensure Docker CLI + daemon socket are reachable when bootstrap is run from
+# a non-interactive shell (cron, ssh -t, etc.) where the user's PATH and
+# DOCKER_HOST aren't picked up. Docker Desktop on macOS exposes its socket at
+# ~/.docker/run/docker.sock — without DOCKER_HOST the CLI hangs. (Same gotcha
+# fixed for Genome.)
+export PATH="/usr/local/bin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:${PATH:-}"
+export DOCKER_HOST="${DOCKER_HOST:-unix://$HOME/.docker/run/docker.sock}"
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOMELAB_ENV="$HOME/homelab/.env"
 TARGET_DIR="$HOME/homelab/reel"
