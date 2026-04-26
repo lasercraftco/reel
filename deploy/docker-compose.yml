@@ -1,0 +1,97 @@
+# Reel — production stack on iMac (192.168.1.92)
+#
+# Reuses Tyler's existing Postgres-on-iMac via host.docker.internal where
+# possible; ships its own isolated container for first install.
+# Watchtower auto-updates by label.
+# Cloudflare tunnel ingress: reel.tyflix.net -> host:3033.
+
+name: reel
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: reel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - reel_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "127.0.0.1:5434:5432"   # 5433 already used by genome
+
+  engine:
+    image: ghcr.io/lasercraftco/reel-engine:latest
+    container_name: reel-engine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      RADARR_URL: http://host.docker.internal:7878
+      PLEX_URL: http://host.docker.internal:32400
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8002:8002"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8002/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web:
+    image: ghcr.io/lasercraftco/reel-web:latest
+    container_name: reel-web
+    restart: unless-stopped
+    depends_on:
+      engine:
+        condition: service_healthy
+    env_file: ../.env
+    environment:
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REEL_ENGINE_URL: http://engine:8002
+      REEL_ENGINE_INTERNAL_URL: http://engine:8002
+    ports:
+      - "3033:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Periodic library scan + nightly recompute (cron-style)
+  scheduler:
+    image: alpine:3.20
+    container_name: reel-scheduler
+    restart: unless-stopped
+    depends_on:
+      engine:
+        condition: service_healthy
+    command: |
+      sh -c 'apk add --no-cache curl tzdata >/dev/null && \
+             while true; do \
+               echo "[$(date -Iseconds)] library scan"; \
+               curl -fsS -X POST http://engine:8002/api/library/scan || true; \
+               sleep 21600; \
+             done'
+
+volumes:
+  reel_pg_data:
+    name: reel_pg_data

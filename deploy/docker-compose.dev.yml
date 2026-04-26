@@ -1,0 +1,28 @@
+# Dev override — runs everything locally, hot-reload.
+name: reel
+
+services:
+  postgres:
+    ports:
+      - "5434:5432"
+
+  engine:
+    build: ../reel-engine
+    image: reel-engine:dev
+    environment:
+      RELOAD: "true"
+      LOG_LEVEL: debug
+    volumes:
+      - ../reel-engine/app:/app/app
+
+  web:
+    build:
+      context: ../reel-web
+      target: dev
+    image: reel-web:dev
+    ports:
+      - "3033:3000"
+    volumes:
+      - ../reel-web:/app
+      - /app/node_modules
+      - /app/.next
