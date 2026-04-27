@@ -5,8 +5,8 @@ import { readSessionFromCookie } from "@/lib/auth/session";
 import { TopBar } from "@/components/layout/top-bar";
 
 const TILES = [
-  { href: "/admin/users", title: "Users", body: "Manage roles, quotas, blocks." },
-  { href: "/admin/requests", title: "Requests", body: "Approve or reject friend add requests." },
+  { href: "/admin/users", title: "Users", body: "Manage roles, blocks, and promotions." },
+  { href: "/admin/quotas", title: "Daily Quotas", body: "Set per-friend request limits." },
   { href: "/admin/audit", title: "Audit log", body: "Every action across users." },
   { href: "/admin/settings", title: "Settings", body: "Engine weights + global config." },
 ];

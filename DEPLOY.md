@@ -51,9 +51,9 @@ for the wiring.
 
 Roles:
 
-- **owner** — Tyler. Full admin, direct Radarr writes.
-- **trusted** — close friends. Direct add (auto-approved).
-- **friend** (default) — request adds; owner approves at `/admin/requests`.
+- **owner** — Tyler. Full admin, direct Radarr writes, unlimited adds.
+- **trusted** — close friends. Direct add (auto-approved), unlimited.
+- **friend** (default) — direct add (auto-approved), 10/day rate limit by default. Owner can override per-user in `/admin/quotas`.
 - **guest** — read-only.
 
 `TYFLIX_OWNER_EMAIL=tylerheon@gmail.com` is auto-promoted to `owner` on first

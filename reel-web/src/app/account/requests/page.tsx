@@ -22,7 +22,7 @@ export default async function MyRequestsPage(): Promise<React.ReactElement> {
     <main className="min-h-dvh">
       <TopBar user={user} />
       <section className="px-4 sm:px-6 lg:px-10 pb-20 max-w-3xl mx-auto pt-6 space-y-4">
-        <h1 className="text-2xl font-semibold">My requests</h1>
+        <h1 className="text-2xl font-semibold">My Library Activity</h1>
         {mine.length === 0 ? (
           <div className="rounded-2xl border border-white/5 bg-[color:var(--brand-surface)] p-6 text-[color:var(--brand-text-dim)] text-sm">
             No requests yet.

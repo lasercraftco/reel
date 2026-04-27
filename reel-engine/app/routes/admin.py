@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,6 +64,36 @@ async def update_user(
     )
     await session.commit()
     return {"ok": True}
+
+
+@router.patch("/users/{user_id}/quota")
+async def update_user_quota(
+    user_id: str,
+    body: dict[str, Any],
+    session: AsyncSession = Depends(get_session),
+    user: TyflixUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    user.require("owner")
+    target = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not target:
+        raise HTTPException(404, "user_not_found")
+    if "daily_request_quota" in body:
+        target.daily_request_quota = int(body["daily_request_quota"])
+    session.add(
+        AuditLog(
+            user_id=user.id,
+            action="admin.update_quota",
+            target=user_id,
+            metadata_={"daily_request_quota": target.daily_request_quota},
+        )
+    )
+    await session.commit()
+    return {
+        "id": target.id,
+        "email": target.email,
+        "role": target.role,
+        "daily_request_quota": target.daily_request_quota,
+    }
 
 
 @router.get("/requests")

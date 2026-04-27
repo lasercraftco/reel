@@ -8,14 +8,20 @@
 
 import { jwtVerify, SignJWT } from "jose";
 
-const SECRET_RAW = process.env.TYFLIX_AUTH_JWT_SECRET;
-if (!SECRET_RAW || SECRET_RAW === "change-me-to-a-random-64-byte-hex") {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("TYFLIX_AUTH_JWT_SECRET is required in production");
+// Lazy-init: do NOT throw at module load (build-time page data collection
+// imports this file without env vars). Throw on first use instead.
+let _secret: Uint8Array | null = null;
+function secret(): Uint8Array {
+  if (_secret) return _secret;
+  const raw = process.env.TYFLIX_AUTH_JWT_SECRET;
+  if (!raw || raw === "change-me-to-a-random-64-byte-hex") {
+    if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build") {
+      throw new Error("TYFLIX_AUTH_JWT_SECRET is required in production");
+    }
   }
+  _secret = new TextEncoder().encode(raw || "dev-only-do-not-use-in-prod");
+  return _secret;
 }
-
-const SECRET = new TextEncoder().encode(SECRET_RAW || "dev-only-do-not-use-in-prod");
 const ISSUER = process.env.TYFLIX_AUTH_JWT_ISSUER ?? "tyflix.net";
 const TTL = Number(process.env.TYFLIX_AUTH_TOKEN_TTL_SECONDS ?? 60 * 60 * 24 * 30);
 
@@ -35,12 +41,12 @@ export async function issueToken(claims: TyflixClaims): Promise<string> {
     .setAudience("tyflix")
     .setIssuedAt()
     .setExpirationTime(`${TTL}s`)
-    .sign(SECRET);
+    .sign(secret());
 }
 
 export async function verifyToken(token: string): Promise<TyflixClaims | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET, {
+    const { payload } = await jwtVerify(token, secret(), {
       issuer: ISSUER,
       audience: "tyflix",
     });
