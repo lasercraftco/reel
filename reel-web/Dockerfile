@@ -3,13 +3,13 @@ ARG NODE_VERSION=22.13.0
 
 FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /app
-RUN corepack enable
+RUN npm install -g corepack@latest && corepack enable
 COPY package.json pnpm-lock.yaml* ./
 RUN if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi
 
 FROM node:${NODE_VERSION}-alpine AS dev
 WORKDIR /app
-RUN corepack enable
+RUN npm install -g corepack@latest && corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_ENV=development HOSTNAME=0.0.0.0
@@ -18,7 +18,7 @@ CMD ["pnpm", "dev", "-p", "3000"]
 
 FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /app
-RUN corepack enable
+RUN npm install -g corepack@latest && corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -26,7 +26,7 @@ RUN pnpm build
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
-RUN corepack enable
+RUN npm install -g corepack@latest && corepack enable
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 COPY --from=builder /app/public ./public

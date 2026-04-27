@@ -28,6 +28,9 @@ services:
 
   engine:
     image: ghcr.io/lasercraftco/reel-engine:latest
+    build:
+      context: ../reel-engine
+      dockerfile: Dockerfile
     container_name: reel-engine
     restart: unless-stopped
     depends_on:
@@ -52,6 +55,9 @@ services:
 
   web:
     image: ghcr.io/lasercraftco/reel-web:latest
+    build:
+      context: ../reel-web
+      dockerfile: Dockerfile
     container_name: reel-web
     restart: unless-stopped
     depends_on:
