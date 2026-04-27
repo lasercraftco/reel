@@ -7,8 +7,6 @@
  * ./migrations (or ./src/lib/db/migrations in dev), then exits.
  */
 
-import "dotenv/config";
-
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { existsSync } from "node:fs";
