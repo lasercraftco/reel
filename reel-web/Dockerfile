@@ -1,15 +1,22 @@
 # syntax=docker/dockerfile:1.7
 ARG NODE_VERSION=22.13.0
 
+# ---- deps ----
 FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /app
-RUN npm install -g corepack@latest && corepack enable
+# Newer pnpm releases ship signatures whose keys aren't bundled in older
+# Corepack snapshots, breaking the build whenever a pnpm release rotates keys.
+# Avoid `npm install -g corepack@latest` because the newer corepack binary
+# crashes under qemu-arm64 emulation (illegal instruction).
+ENV COREPACK_INTEGRITY_KEYS=0
+RUN corepack enable && corepack prepare pnpm@9.15.2 --activate
 COPY package.json pnpm-lock.yaml* ./
 RUN if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi
 
 FROM node:${NODE_VERSION}-alpine AS dev
 WORKDIR /app
-RUN npm install -g corepack@latest && corepack enable
+ENV COREPACK_INTEGRITY_KEYS=0
+RUN corepack enable && corepack prepare pnpm@9.15.2 --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_ENV=development HOSTNAME=0.0.0.0
@@ -18,7 +25,8 @@ CMD ["pnpm", "dev", "-p", "3000"]
 
 FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /app
-RUN npm install -g corepack@latest && corepack enable
+ENV COREPACK_INTEGRITY_KEYS=0
+RUN corepack enable && corepack prepare pnpm@9.15.2 --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -26,7 +34,8 @@ RUN pnpm build
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
-RUN npm install -g corepack@latest && corepack enable
+ENV COREPACK_INTEGRITY_KEYS=0
+RUN corepack enable && corepack prepare pnpm@9.15.2 --activate
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 COPY --from=builder /app/public ./public
