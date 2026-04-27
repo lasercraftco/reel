@@ -29,7 +29,11 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    email: varchar("email", { length: 320 }).notNull(),
+    username: varchar("username", { length: 50 }).notNull(),
+    displayName: varchar("display_name", { length: 200 }),
+    isOwner: boolean("is_owner").notNull().default(false),
+    // email kept for backward-compat but no longer required
+    email: varchar("email", { length: 320 }),
     name: varchar("name", { length: 200 }),
     avatarUrl: varchar("avatar_url", { length: 800 }),
     role: varchar("role", { length: 20 }).notNull().default("friend"), // owner | trusted | friend | guest
@@ -41,7 +45,8 @@ export const users = pgTable(
     settings: jsonb("settings").$type<UserSettings>().notNull().default(sql`'{}'::jsonb`),
   },
   (t) => ({
-    emailIdx: uniqueIndex("uq_users_email").on(t.email),
+    usernameIdx: uniqueIndex("uq_users_username").on(t.username),
+    emailIdx: index("idx_users_email").on(t.email),
   }),
 );
 
@@ -55,22 +60,6 @@ export type UserSettings = {
   weights?: Record<string, number>;
   surpriseRatio?: number;
 };
-
-export const magicLinks = pgTable(
-  "magic_links",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    email: varchar("email", { length: 320 }).notNull(),
-    tokenHash: varchar("token_hash", { length: 128 }).notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    consumedAt: timestamp("consumed_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => ({
-    tokenIdx: uniqueIndex("uq_magic_links_token").on(t.tokenHash),
-    emailIdx: index("ix_magic_links_email").on(t.email),
-  }),
-);
 
 export const sessions = pgTable(
   "sessions",

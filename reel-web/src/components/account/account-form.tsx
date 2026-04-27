@@ -20,7 +20,7 @@ export function AccountForm({ user }: { user: SessionUser }): React.ReactElement
 
   return (
     <div className="rounded-2xl border border-white/5 bg-[color:var(--brand-surface)] p-5 space-y-4">
-      <Row label="Email">{user.email}</Row>
+      <Row label="Name">{(user as any).displayName ?? (user as any).name ?? (user as any).username ?? user.email}</Row>
       <Row label="Role">{user.role}</Row>
       <label className="flex items-center justify-between">
         <span className="text-sm text-[color:var(--brand-text-dim)]">Family-friendly only (≤ PG-13)</span>

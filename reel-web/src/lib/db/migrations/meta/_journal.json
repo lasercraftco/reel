@@ -8,6 +8,20 @@
       "when": 1745689200000,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1761449200000,
+      "tag": "0001_increase_quota_default",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777264700000,
+      "tag": "0002_first_name_auth",
+      "breakpoints": true
     }
   ]
 }

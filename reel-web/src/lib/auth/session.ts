@@ -23,6 +23,9 @@ export type SessionUser = {
   avatarUrl: string | null;
   role: "owner" | "trusted" | "friend" | "guest";
   blocked: boolean;
+  username: string;
+  displayName: string | null;
+  isOwner: boolean;
 };
 
 export async function readSessionFromCookie(): Promise<SessionUser | null> {
@@ -32,29 +35,69 @@ export async function readSessionFromCookie(): Promise<SessionUser | null> {
   return await sessionUserFromToken(raw);
 }
 
-export async function sessionUserFromToken(token: string): Promise<SessionUser | null> {
-  const claims = await verifyToken(token);
-  if (!claims) return null;
-  const row = (
-    await db.select().from(users).where(eq(users.id, claims.sub)).limit(1)
+/**
+ * Resolve (or auto-create) a user from JWT claims. Used when the SSO cookie
+ * was issued by a sibling tyflix app for a username this reel DB hasn't
+ * seen yet.
+ */
+async function findOrCreateByUsername(username: string, displayName?: string): Promise<SessionUser | null> {
+  const existing = (await db.select().from(users).where(eq(users.username, username)).limit(1))[0];
+  if (existing) return mapRow(existing);
+  const isOwner = username === (process.env.TYFLIX_OWNER_USERNAME ?? "tyler").toLowerCase();
+  const inserted = (
+    await db
+      .insert(users)
+      .values({
+        username,
+        displayName: displayName ?? username,
+        isOwner,
+        name: displayName ?? username,
+        role: isOwner ? "owner" : "friend",
+      })
+      .returning()
   )[0];
-  if (!row || row.blocked) return null;
+  return mapRow(inserted);
+}
+
+function mapRow(row: typeof users.$inferSelect): SessionUser {
   return {
     id: row.id,
-    email: row.email,
-    name: row.name,
+    email: row.email ?? "",
+    name: row.displayName ?? row.name ?? row.username,
     avatarUrl: row.avatarUrl,
     role: row.role as SessionUser["role"],
     blocked: row.blocked,
+    username: row.username,
+    displayName: row.displayName ?? null,
+    isOwner: row.isOwner ?? false,
   };
+}
+
+export async function sessionUserFromToken(token: string): Promise<SessionUser | null> {
+  const claims = await verifyToken(token);
+  if (!claims) return null;
+  // First-name SSO: claims.sub is the username slug.
+  // Try by username; fall back to legacy id-based lookup; auto-create if missing.
+  const sub = String(claims.sub);
+  let row = (await db.select().from(users).where(eq(users.username, sub)).limit(1))[0];
+  if (!row) {
+    // legacy tokens: claims.sub is a UUID
+    row = (await db.select().from(users).where(eq(users.id, sub)).limit(1))[0];
+  }
+  if (!row) {
+    // first sight of this user in reel — auto-create from the SSO claim
+    const display = (typeof claims.name === "string" && claims.name) || sub;
+    return await findOrCreateByUsername(sub, display);
+  }
+  if (row.blocked) return null;
+  return mapRow(row);
 }
 
 export function buildClaims(user: SessionUser): TyflixClaims {
   return {
-    sub: user.id,
-    email: user.email,
-    name: user.name ?? undefined,
-    role: user.role,
+    sub: user.username,
+    name: user.displayName ?? user.name ?? user.username,
+    isOwner: user.isOwner === true || user.role === "owner",
     app: "reel",
   };
 }

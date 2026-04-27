@@ -88,7 +88,7 @@ function QuotaRow({
   return (
     <tr>
       <Td>
-        <div>{user.email}</div>
+        <div>{(user as any).displayName ?? (user as any).username ?? user.email}</div>
         <div className="text-xs text-[color:var(--brand-text-faint)]">{user.name || "—"}</div>
       </Td>
       <Td>

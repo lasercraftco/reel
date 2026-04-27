@@ -13,7 +13,7 @@ import { jwtVerify, SignJWT } from "jose";
 let _secret: Uint8Array | null = null;
 function secret(): Uint8Array {
   if (_secret) return _secret;
-  const raw = process.env.TYFLIX_AUTH_JWT_SECRET;
+  const raw = process.env.TYFLIX_AUTH_JWT_SECRET ?? process.env.TYFLIX_PORTAL_JWT_SECRET;
   if (!raw || raw === "change-me-to-a-random-64-byte-hex") {
     if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build") {
       throw new Error("TYFLIX_AUTH_JWT_SECRET is required in production");
@@ -26,11 +26,10 @@ const ISSUER = process.env.TYFLIX_AUTH_JWT_ISSUER ?? "tyflix.net";
 const TTL = Number(process.env.TYFLIX_AUTH_TOKEN_TTL_SECONDS ?? 60 * 60 * 24 * 30);
 
 export type TyflixClaims = {
-  sub: string;        // user uuid
-  email: string;
-  name?: string;
-  role: "owner" | "trusted" | "friend" | "guest";
-  app: "reel" | "genome" | "karaoke";
+  sub: string;            // username (slug). legacy tokens may carry a uuid here.
+  name?: string;          // display name (first-name as typed)
+  isOwner: boolean;
+  app?: "reel" | "genome" | "karaoke" | "portal";
 };
 
 export async function issueToken(claims: TyflixClaims): Promise<string> {
@@ -55,3 +54,17 @@ export async function verifyToken(token: string): Promise<TyflixClaims | null> {
     return null;
   }
 }
+// Appended to reel-web/src/lib/auth/jwt.ts:
+
+/**
+ * Slugify a first name into a stable username.
+ * "Tyler" -> "tyler", " Anna-Marie " -> "annamarie"
+ */
+export function slugifyName(raw: string): string {
+  return raw.normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 50);
+}
+
+export const OWNER_USERNAME = (process.env.TYFLIX_OWNER_USERNAME ?? "tyler").toLowerCase();

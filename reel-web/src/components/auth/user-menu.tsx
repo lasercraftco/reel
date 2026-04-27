@@ -12,7 +12,7 @@ export function UserMenu({ user }: { user: SessionUser }): React.ReactElement {
       <DropdownMenu.Trigger asChild>
         <button className="size-9 rounded-full bg-[color:var(--brand-surface-2)] flex items-center justify-center hover:ring-2 hover:ring-[color:var(--brand-primary)]">
           <span className="text-sm font-semibold">
-            {(user.name?.[0] || user.email[0] || "?").toUpperCase()}
+            {(user.displayName?.[0] || user.name?.[0] || user.username?.[0] || user.email?.[0] || "?").toUpperCase()}
           </span>
         </button>
       </DropdownMenu.Trigger>
@@ -23,7 +23,7 @@ export function UserMenu({ user }: { user: SessionUser }): React.ReactElement {
           className="z-50 min-w-[220px] rounded-lg bg-[color:var(--brand-surface)] border border-white/10 shadow-2xl py-1 text-sm"
         >
           <div className="px-3 py-2 text-xs text-[color:var(--brand-text-faint)]">
-            <div className="text-[color:var(--brand-text)]">{user.name || user.email}</div>
+            <div className="text-[color:var(--brand-text)]">{user.displayName || user.name || user.username || user.email}</div>
             <div className="text-[10px] uppercase tracking-wider mt-0.5">{user.role}</div>
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-white/5" />

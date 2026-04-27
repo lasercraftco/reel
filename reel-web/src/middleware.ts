@@ -44,13 +44,14 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(url);
   }
   // Block admin pages for non-owners
-  if (pathname.startsWith("/admin") && claims.role !== "owner") {
+  if (pathname.startsWith("/admin") && claims.isOwner !== true) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
   const res = NextResponse.next();
-  res.headers.set("x-reel-user-id", claims.sub);
-  res.headers.set("x-reel-user-role", claims.role);
+  res.headers.set("x-reel-user-username", claims.sub);
+  res.headers.set("x-reel-user-display-name", claims.name ?? "");
+  res.headers.set("x-reel-user-is-owner", claims.isOwner ? "1" : "0");
   return res;
 }
 
