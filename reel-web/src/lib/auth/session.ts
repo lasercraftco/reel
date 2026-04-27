@@ -77,12 +77,16 @@ export async function sessionUserFromToken(token: string): Promise<SessionUser |
   const claims = await verifyToken(token);
   if (!claims) return null;
   // First-name SSO: claims.sub is the username slug.
-  // Try by username; fall back to legacy id-based lookup; auto-create if missing.
+  // Try by username; fall back to legacy id-based lookup (only if sub looks
+  // like a UUID, since users.id is a uuid column); auto-create if missing.
   const sub = String(claims.sub);
   let row = (await db.select().from(users).where(eq(users.username, sub)).limit(1))[0];
-  if (!row) {
-    // legacy tokens: claims.sub is a UUID
-    row = (await db.select().from(users).where(eq(users.id, sub)).limit(1))[0];
+  if (!row && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sub)) {
+    try {
+      row = (await db.select().from(users).where(eq(users.id, sub)).limit(1))[0];
+    } catch {
+      row = undefined as any;
+    }
   }
   if (!row) {
     // first sight of this user in reel — auto-create from the SSO claim
