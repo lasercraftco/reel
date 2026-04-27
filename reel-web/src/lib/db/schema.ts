@@ -35,7 +35,7 @@ export const users = pgTable(
     role: varchar("role", { length: 20 }).notNull().default("friend"), // owner | trusted | friend | guest
     blocked: boolean("blocked").notNull().default(false),
     onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
-    dailyRequestQuota: integer("daily_request_quota").notNull().default(5),
+    dailyRequestQuota: integer("daily_request_quota").notNull().default(10),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     settings: jsonb("settings").$type<UserSettings>().notNull().default(sql`'{}'::jsonb`),

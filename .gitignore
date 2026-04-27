@@ -10,3 +10,6 @@ build/
 .turbo/
 coverage/
 .pnpm-store/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo

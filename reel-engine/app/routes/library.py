@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import TyflixUser, get_current_user
@@ -66,39 +67,53 @@ async def request_add(
     movie = (await session.execute(select(Movie).where(Movie.id == body.movie_id))).scalar_one_or_none()
     if not movie:
         raise HTTPException(404, "movie_not_found")
-    auto_approve = user.role in {"owner", "trusted"} or get_settings().reel_friend_auto_approve
+
+    # Daily rate-limit check for friends
+    if user.role == "friend":
+        cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+        recent = (await session.execute(
+            select(func.count(LibraryAdd.id)).where(
+                and_(LibraryAdd.user_id == user.id, LibraryAdd.created_at >= cutoff)
+            )
+        )).scalar_one()
+        quota = me.daily_request_quota or 10
+        if recent and recent >= quota:
+            raise HTTPException(429, f"daily quota reached ({quota})")
+
+    # ALL users now auto-approve; status flows: auto_approved → submitted (or failed)
+    now = datetime.now(timezone.utc)
     add = LibraryAdd(
         user_id=user.id,
         movie_id=body.movie_id,
-        status="approved" if auto_approve else "requested",
+        status="auto_approved",
         quality_profile_id=body.quality_profile_id,
         note=body.note,
-        decision_by=user.id if auto_approve else None,
+        decision_by=user.id,
+        decision_at=now,
     )
     session.add(add)
 
     submitted_payload: dict[str, Any] | None = None
-    if auto_approve:
-        try:
-            submitted_payload = await _submit_to_radarr(movie, body.quality_profile_id)
-            add.status = "submitted"
-        except Exception as exc:  # noqa: BLE001
-            add.status = "failed"
-            session.add(
-                AuditLog(
-                    user_id=user.id,
-                    action="library.submit_failed",
-                    target=str(movie.id),
-                    metadata_={"error": str(exc)},
-                )
+    try:
+        submitted_payload = await _submit_to_radarr(movie, body.quality_profile_id)
+        add.status = "submitted"
+    except Exception as exc:  # noqa: BLE001
+        add.status = "failed"
+        session.add(
+            AuditLog(
+                user_id=user.id,
+                action="library.submit_failed",
+                target=str(movie.id),
+                metadata_={"error": str(exc)},
             )
+        )
 
     session.add(
         AuditLog(
             user_id=user.id,
-            action="library.add" if auto_approve else "library.request",
+            action="library.add",
             target=str(movie.id),
-            metadata_={"title": movie.title, "auto_approve": auto_approve},
+            metadata_={"title": movie.title, "auto_approved": True},
         )
     )
     await session.commit()
@@ -108,42 +123,11 @@ async def request_add(
 @router.post("/decision")
 async def decision(
     body: AddDecision,
-    session: AsyncSession = Depends(get_session),
-    user: TyflixUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),  # noqa: F841
+    user: TyflixUser = Depends(get_current_user),  # noqa: F841
 ) -> dict[str, Any]:
-    user.require("owner")
-    add = (await session.execute(select(LibraryAdd).where(LibraryAdd.id == body.add_id))).scalar_one_or_none()
-    if not add:
-        raise HTTPException(404, "request_not_found")
-    movie = (await session.execute(select(Movie).where(Movie.id == add.movie_id))).scalar_one()
-    add.decision_by = user.id
-    if body.decision == "approved":
-        add.status = "approved"
-        try:
-            await _submit_to_radarr(movie, body.quality_profile_id or add.quality_profile_id)
-            add.status = "submitted"
-        except Exception as exc:  # noqa: BLE001
-            add.status = "failed"
-            session.add(
-                AuditLog(
-                    user_id=user.id,
-                    action="library.decision_submit_failed",
-                    target=str(movie.id),
-                    metadata_={"error": str(exc)},
-                )
-            )
-    else:
-        add.status = "rejected"
-    session.add(
-        AuditLog(
-            user_id=user.id,
-            action=f"library.decision.{body.decision}",
-            target=str(movie.id),
-            metadata_={"add_id": add.id},
-        )
-    )
-    await session.commit()
-    return {"add_id": add.id, "status": add.status}
+    # Deprecated: approval gate removed; all adds are now auto-approved.
+    raise HTTPException(410, "approval gate removed; all adds are auto-approved")
 
 
 async def _submit_to_radarr(movie: Movie, quality_profile_id: int | None) -> dict[str, Any]:

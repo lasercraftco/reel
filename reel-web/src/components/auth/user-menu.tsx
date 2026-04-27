@@ -28,7 +28,7 @@ export function UserMenu({ user }: { user: SessionUser }): React.ReactElement {
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-white/5" />
           <Item href="/watchlist" icon={<Bookmark className="size-4" />}>Watchlist</Item>
-          <Item href="/account/requests" icon={<Inbox className="size-4" />}>My requests</Item>
+          <Item href="/account/requests" icon={<Inbox className="size-4" />}>My Library Activity</Item>
           <Item href="/account" icon={<Settings className="size-4" />}>Settings</Item>
           {user.role === "owner" && (
             <Item href="/admin" icon={<Shield className="size-4" />}>Admin</Item>
