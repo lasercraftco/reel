@@ -4,10 +4,6 @@ ARG NODE_VERSION=22.13.0
 # ---- deps ----
 FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /app
-# Newer pnpm releases ship signatures whose keys aren't bundled in older
-# Corepack snapshots, breaking the build whenever a pnpm release rotates keys.
-# Avoid `npm install -g corepack@latest` because the newer corepack binary
-# crashes under qemu-arm64 emulation (illegal instruction).
 ENV COREPACK_INTEGRITY_KEYS=0
 RUN corepack enable && corepack prepare pnpm@9.15.2 --activate
 COPY package.json pnpm-lock.yaml* ./
@@ -31,19 +27,20 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
+# Bundle migrate.ts so the runner image doesn't need tsx/esbuild at runtime.
+RUN pnpm exec esbuild src/lib/db/migrate.ts \
+      --bundle --platform=node --target=node22 --format=cjs \
+      --outfile=migrate.cjs
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
-ENV COREPACK_INTEGRITY_KEYS=0
-RUN corepack enable && corepack prepare pnpm@9.15.2 --activate
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/src/lib/db/migrations ./migrations
-COPY --from=builder --chown=nextjs:nodejs /app/src/lib/db/migrate.ts ./migrate.ts
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tsx ./node_modules/tsx
+COPY --from=builder --chown=nextjs:nodejs /app/migrate.cjs ./migrate.cjs
 USER nextjs
 EXPOSE 3000
-CMD sh -c "node ./node_modules/tsx/dist/cli.mjs ./migrate.ts && exec node server.js"
+CMD sh -c "node ./migrate.cjs && exec node server.js"
